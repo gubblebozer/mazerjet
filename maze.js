@@ -1,19 +1,26 @@
 var mwid, mhgt;
+var compute_seconds = 1;
+var fr = 5; // frameRate
 var lnwid = 2;
 var w = 24;
 var cells;
 var c = { x: 0, y: 0 };
 var stack = [];
 var stack_num = 0;
-var done = false;
-var cpw = 80;
+var cpw = 40;
 var cellsz = 0;
-var maze_drawn = false;
+var maze_computed = false;
 var is_print = true;
 var stack_max = 0;
 var stack_max_p = { x: 0, y: 0 };
 var edge_max = 0;
 var edge_max_p = { x: 0, y: 0 };
+var cells_per_frame = -1;
+var cpw_slider;
+var seed;
+var controls = false;
+var refresh_tmo = 250;
+var refresh_at = 0;
 
 function maze_init()
 {
@@ -27,13 +34,36 @@ function maze_init()
 	    cells[x][y] = false;
 	}
     }
+
+    c = { x: 0, y: 0 };
+    stack_max = 0;
+    stack_max_p = { x: 0, y: 0 };
+    edge_max = 0;
+    edge_max_p = { x: 0, y: 0 };
+    stack = [];
+    stack_num = 0;
 }
 
-function setup()
+function controls_up()
 {
-    createCanvas(windowWidth, windowHeight);
-    strokeWeight(1);
+    if (!controls) {
+	cpw_slider = createSlider(4, 99, cpw);
+	cpw_slider.position(10, 10);
+	cpw_slider.style('width', '80px');
+	controls = true;
+    }
+}
 
+function controls_down()
+{
+    if (controls) {
+	cpw_slider = null;
+	controls = false;
+    }
+}
+
+function setup_int()
+{
     // leave two border cells, and make sure the maze is odd
     // 10 width, but must be odd
     // bb mm mm mm mm mm mm mm bb
@@ -45,6 +75,8 @@ function setup()
     // bb xx xx xx xx xx bb
     // bb xx xx mm xx xx bb
 
+    createCanvas(windowWidth, windowHeight);
+    randomSeed(seed);
     cellsz = int(width / cpw);
     mwid = int(width / cellsz) - 2;
     mhgt = int(height / cellsz) - 2;
@@ -56,6 +88,18 @@ function setup()
     }
     maze_init();
     cells[c.x][c.y] = true;
+
+    cells_per_frame = ((mwid * mhgt) / compute_seconds) / fr;
+    maze_computed = false;
+}
+
+function setup()
+{
+    seed = (hour() * 3600) + (minute() * 60) + second();
+    frameRate(fr);
+    strokeWeight(1);
+    setup_int();
+    controls_up();
 }
 
 // Return coordinates of the upper left corner of the specified cell.
@@ -195,7 +239,7 @@ function maze_next()
 		draw_arrow( { x: 0, y: -1 }, { x: 0, y: -1} );
 	    }
 
-	    done = true;
+	    maze_computed = true;
 	}
     }
     else {
@@ -225,15 +269,18 @@ function maze_next()
 	//print("x: " + c.x + ", y: " + c.y)
     }
 
-    return done;
+    return maze_computed;
 }
 
-function draw_maze() 
-{
-    var x, y;
 
-    // bb mm bb
-    // blue border:
+function draw_maze_background()
+{
+    // clear canvas
+    stroke(0xff);
+    fill(0xff);
+    rect(0, 0, windowWidth, windowHeight);
+
+    // fill with proper outer maze color
     if (is_print) {
 	stroke(0);
 	fill(0);
@@ -246,18 +293,15 @@ function draw_maze()
 	 ((mwid + 2) * cellsz), 
 	 ((mhgt + 2) * cellsz));
 
-    // white maze backdrop
-    if (is_print) {
-	stroke(0);
-	fill(0);
-    }
-    else {
-	stroke(0xff);
-	fill(0xff);
-    }
-    rect(cellsz, cellsz, 
-	 (mwid * cellsz), 
-	 (mhgt * cellsz));
+    // draw first cell
+    draw_cell({x: 0, y: 0}, false);
+}
+
+function draw_maze() 
+{
+    draw_maze_background();
+
+    var x, y;
 
     for (x = 0; x < mwid; x++) {
 	for (y = 0; y < mhgt; y++) {
@@ -266,27 +310,52 @@ function draw_maze()
     }
     
     draw_cell({x: 0, y: 0}, false);
+
+    if (controls) {
+	noStroke();
+	fill(0x30, 0x30, 0xff);
+	textSize(16);
+	text(cpw, 100, 25);
+    }
+}
+
+function windowResized()
+{
+    if (!refresh_at) {
+	refresh_at = millis() + refresh_tmo;
+    }
 }
 
 function draw() 
 {
-    if (done) {
-	noLoop();
-	return;
+    if (controls) {
+	new_cpw = cpw_slider.value();
+	if (new_cpw != cpw) {
+	    cpw = new_cpw;
+	    if (!refresh_at) {
+		refresh_at = millis() + refresh_tmo;
+	    }
+	}
     }
 
-    if (!maze_drawn) {
-	draw_maze();
-	maze_drawn = true;
-	return;
+    if (refresh_at && millis() >= refresh_at) {
+	setup_int();
+	refresh_at = 0;
     }
 
-     var budget;
+    draw_maze();
 
-     for (budget = 0; budget < 32; budget++) {
+    if (maze_computed) {
+	// noLoop();
+	return;
+    }
+    
+    var budget;
+     
+    for (budget = 0; budget < cells_per_frame; budget++) {
  	if (maze_next()) {
-	    noLoop();
+	    // noLoop();
  	    break;
  	}
-     }
+    }
 }
