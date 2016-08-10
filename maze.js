@@ -7,7 +7,7 @@ var cells;
 var c = { x: 0, y: 0 };
 var stack = [];
 var stack_num = 0;
-var cpw = 40;
+var cpw = 39;
 var cellsz = 0;
 var maze_computed = false;
 var is_print = true;
@@ -18,9 +18,14 @@ var edge_max_p = { x: 0, y: 0 };
 var cells_per_frame = -1;
 var cpw_slider;
 var seed;
+var btn_seed_submit;
+var btn_new_maze;
 var controls = false;
 var refresh_tmo = 250;
 var refresh_at = 0;
+var control_p = { x: 40, y: 40 };
+var advanced = false;
+var print_pending = false;
 
 function maze_init()
 {
@@ -44,20 +49,74 @@ function maze_init()
     stack_num = 0;
 }
 
+function setup_controls()
+{
+    cpw_slider = createSlider(5, 199, cpw);
+    cpw_slider.position(control_p.x + 10, control_p.y + 10);
+    cpw_slider.style('width', '230px');
+
+    btn_new_maze = createButton('different maze');
+    btn_new_maze.position(control_p.x + 10, control_p.y + 90);
+    btn_new_maze.mousePressed(seed_randomize);
+
+    btn_print_maze = createButton('print maze');
+    btn_print_maze.position(control_p.x + 10, control_p.y + 130);
+    btn_print_maze.mousePressed(print_maze);
+
+    if (advanced) {
+        seed_input = createInput(seed);
+        seed_input.position(10, 50);
+        seed_input.style('width', '160px');
+        
+        btn_seed_submit = createButton('seed');
+        btn_seed_submit.position(175, 50);
+        btn_seed_submit.mousePressed(seed_set);
+    }
+    
+    controls = true;
+}
+
+function seed_set()
+{
+    var tst = parseInt(seed_input.value());
+    if (tst != NaN) {
+	seed = tst;
+	if (!refresh_at) {
+	    refresh_at = millis() + refresh_tmo;
+	}
+    }
+}
+
+function seed_randomize()
+{
+    seed = random(2147483648);
+    if (!refresh_at) {
+	refresh_at = millis() + refresh_tmo;
+    }
+}
+
+function print_maze()
+{
+    controls_down();
+    print_pending = true;
+}
+
 function controls_up()
 {
     if (!controls) {
-	cpw_slider = createSlider(4, 99, cpw);
-	cpw_slider.position(10, 10);
-	cpw_slider.style('width', '80px');
-	controls = true;
+        btn_new_maze.show();
+        btn_print_maze.show();
+        cpw_slider.show();
+	controls = false;
     }
 }
 
 function controls_down()
 {
     if (controls) {
-	cpw_slider = null;
+        btn_new_maze.hide();
+        btn_print_maze.hide();
+        cpw_slider.hide();
 	controls = false;
     }
 }
@@ -99,7 +158,7 @@ function setup()
     frameRate(fr);
     strokeWeight(1);
     setup_int();
-    controls_up();
+    setup_controls();
 }
 
 // Return coordinates of the upper left corner of the specified cell.
@@ -201,44 +260,6 @@ function maze_next()
 	    c = stack.pop();
 	}
 	else {
-	    stroke(0xff, 0, 0);
-	    fill(0xff, 0, 0);
-	    strokeWeight(1);
-	    var end = cell_coords(stack_max_p);
-	    ellipse(end.x + (cellsz / 2), end.y + (cellsz / 2), cellsz/2, cellsz/2);
-	    
-// 	    stroke(0xb0, 0, 0xff);
-// 	    fill(0xb0, 0, 0xff);
-// 	    end = cell_coords(edge_max_p);
-// 	    ellipse(end.x + (cellsz / 2), end.y + (cellsz / 2), cellsz/2, cellsz/2);
-	    
-	    if (edge_max_p.x == 0) {
-		draw_cell({ x: -1, y: edge_max_p.y }, true);
-		draw_arrow( { x: -1, y: edge_max_p.y }, { x: 1, y: 0 });
-	    }
-	    else if (edge_max_p.x == mwid - 1) {
-		draw_cell({ x: mwid, y: edge_max_p.y }, true);
-		draw_arrow( { x: mwid, y: edge_max_p.y }, { x: -1, y: 0 });
-	    }
-	    else if (edge_max_p.y == 0) {
-		draw_cell({ x: edge_max_p.x, y: -1 }, true);
-		draw_arrow({ x: edge_max_p.x, y: -1 }, { x: 0, y: 1 });
-	    }
-	    else {
-		draw_cell({ x: edge_max_p.x, y: mhgt }, true);
-		draw_arrow({ x: edge_max_p.x, y: mhgt }, { x: 0, y: -1 });
-	    }
-
-	    // draw starting arrow, cutout cell
-	    if (cells[1][0]) {
-		draw_cell({ x: -1, y: 0 }, true);
-		draw_arrow( { x: -1, y: 0 }, { x: -1, y: 0} );
-	    }
-	    else {
-		draw_cell({ x: 0, y: -1 }, true);
-		draw_arrow( { x: 0, y: -1 }, { x: 0, y: -1} );
-	    }
-
 	    maze_computed = true;
 	}
     }
@@ -311,11 +332,78 @@ function draw_maze()
     
     draw_cell({x: 0, y: 0}, false);
 
+    if (maze_computed) {
+	stroke(0xff, 0, 0);
+	//fill(0xE8, 0xD2, 0x46);
+	fill(0xff, 0, 0);
+	strokeWeight(1);
+	var end = cell_coords(stack_max_p);
+	//var queen = String.fromCodePoint(0x2655);
+	//text(queen, end.x, end.y + cellsz);
+	ellipse(end.x + (cellsz / 2), end.y + (cellsz / 2), cellsz/2, cellsz/2);
+	
+	// 	    stroke(0xb0, 0, 0xff);
+	// 	    fill(0xb0, 0, 0xff);
+	// 	    end = cell_coords(edge_max_p);
+	// 	    ellipse(end.x + (cellsz / 2), end.y + (cellsz / 2), cellsz/2, cellsz/2);
+	
+	if (edge_max_p.x == 0) {
+	    draw_cell({ x: -1, y: edge_max_p.y }, true);
+	    draw_arrow( { x: -1, y: edge_max_p.y }, { x: 1, y: 0 });
+	}
+	else if (edge_max_p.x == mwid - 1) {
+	    draw_cell({ x: mwid, y: edge_max_p.y }, true);
+	    draw_arrow( { x: mwid, y: edge_max_p.y }, { x: -1, y: 0 });
+	}
+	else if (edge_max_p.y == 0) {
+	    draw_cell({ x: edge_max_p.x, y: -1 }, true);
+	    draw_arrow({ x: edge_max_p.x, y: -1 }, { x: 0, y: 1 });
+	}
+	else {
+	    draw_cell({ x: edge_max_p.x, y: mhgt }, true);
+	    draw_arrow({ x: edge_max_p.x, y: mhgt }, { x: 0, y: -1 });
+	}
+	
+	// draw starting arrow, cutout cell
+	if (cells[1][0]) {
+	    draw_cell({ x: -1, y: 0 }, true);
+	    draw_arrow( { x: -1, y: 0 }, { x: -1, y: 0} );
+	}
+	else {
+	    draw_cell({ x: 0, y: -1 }, true);
+	    draw_arrow( { x: 0, y: -1 }, { x: 0, y: -1} );
+	}
+    }
+
     if (controls) {
+
+	// translucent backdrop for controls
+	strokeWeight(1);
+	stroke(0x20, 0x20, 0xc0, 0xb0);
+	fill(0x20, 0x20, 0xc0, 0xb0);
+
+        if (advanced) {
+	    rect(control_p.x, control_p.y, 600, 250);
+        }
+        else {
+	    rect(control_p.x, control_p.y, 600, 160);
+        }
+
 	noStroke();
-	fill(0x30, 0x30, 0xff);
+
+	fill(0xff);
 	textSize(16);
-	text(cpw, 100, 25);
+	text(cpw, 300, control_p.y + 25);
+
+        textSize(20);
+	text("Move the slider to change the", 350, control_p.y + 25);
+	text("maze toughness.  Left is easier.", 350, control_p.y + 45);
+	text("Right is harder.", 350, control_p.y + 65);
+
+        text("Generate a different maze.", 350, control_p.y + 105);
+
+        text("Send the maze to the printer.", 350, control_p.y + 145);
+
     }
 }
 
@@ -344,6 +432,11 @@ function draw()
     }
 
     draw_maze();
+
+    if (print_pending) {
+        print();
+        print_pending = false;
+    }
 
     if (maze_computed) {
 	// noLoop();
