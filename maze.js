@@ -22,11 +22,12 @@ var btn_seed_submit;
 var btn_new_maze;
 var btn_hide_controls;
 var controls = false;
-var refresh_tmo = 250;
-var refresh_at = 0;
+var recompute_tmo = 250;
+var recompute_at = 0;
 var control_p = { x: 40, y: 40 };
 var advanced = false;
 var release_latch = false;
+var refresh = false;
 
 function maze_init()
 {
@@ -82,8 +83,8 @@ function seed_set()
     var tst = parseInt(seed_input.value());
     if (tst != NaN) {
 	seed = tst;
-	if (!refresh_at) {
-	    refresh_at = millis() + refresh_tmo;
+	if (!recompute_at) {
+	    recompute_at = millis() + recompute_tmo;
 	}
     }
 }
@@ -91,8 +92,8 @@ function seed_set()
 function seed_randomize()
 {
     seed = random(2147483648);
-    if (!refresh_at) {
-	refresh_at = millis() + refresh_tmo;
+    if (!recompute_at) {
+	recompute_at = millis() + recompute_tmo;
     }
 }
 
@@ -109,6 +110,7 @@ function controls_up()
         btn_hide_controls.show();
         cpw_slider.show();
 	controls = true;
+        refresh = true;
     }
 }
 
@@ -119,6 +121,7 @@ function controls_down()
         btn_hide_controls.hide();
         cpw_slider.hide();
 	controls = false;
+        refresh = true;
     }
 }
 
@@ -151,6 +154,7 @@ function setup_int()
 
     cells_per_frame = ((mwid * mhgt) / compute_seconds) / fr;
     maze_computed = false;
+    refresh = true;
 }
 
 function setup()
@@ -319,6 +323,37 @@ function draw_maze_background()
     draw_cell({x: 0, y: 0}, false);
 }
 
+function draw_control_backdrop()
+{
+    // translucent backdrop for controls
+    strokeWeight(1);
+    stroke(0x20, 0x20, 0xc0, 0xb0);
+    fill(0x20, 0x20, 0xc0, 0xb0);
+    
+    if (advanced) {
+	rect(control_p.x, control_p.y, 600, 270);
+    }
+    else {
+	rect(control_p.x, control_p.y, 600, 180);
+    }
+    
+    noStroke();
+    
+    fill(0xff);
+    textSize(16);
+    text(cpw, 300, control_p.y + 25);
+    
+    textSize(20);
+    text("Move the slider to change the", 350, control_p.y + 25);
+    text("maze difficulty.  Left is easier.", 350, control_p.y + 45);
+    text("Right is harder.", 350, control_p.y + 65);
+    
+    text("Generate a different maze.", 350, control_p.y + 105);
+    
+    text("Hide these controls so you can", 350, control_p.y + 145);
+    text("print out the maze.", 350, control_p.y + 165);
+}
+
 function draw_maze() 
 {
     draw_maze_background();
@@ -377,42 +412,14 @@ function draw_maze()
     }
 
     if (controls) {
-
-	// translucent backdrop for controls
-	strokeWeight(1);
-	stroke(0x20, 0x20, 0xc0, 0xb0);
-	fill(0x20, 0x20, 0xc0, 0xb0);
-
-        if (advanced) {
-	    rect(control_p.x, control_p.y, 600, 270);
-        }
-        else {
-	    rect(control_p.x, control_p.y, 600, 180);
-        }
-
-	noStroke();
-
-	fill(0xff);
-	textSize(16);
-	text(cpw, 300, control_p.y + 25);
-
-        textSize(20);
-	text("Move the slider to change the", 350, control_p.y + 25);
-	text("maze difficulty.  Left is easier.", 350, control_p.y + 45);
-	text("Right is harder.", 350, control_p.y + 65);
-
-        text("Generate a different maze.", 350, control_p.y + 105);
-
-        text("Hide these controls so you can", 350, control_p.y + 145);
-        text("print out the maze.", 350, control_p.y + 165);
-
+        draw_control_backdrop();
     }
 }
 
 function windowResized()
 {
-    if (!refresh_at) {
-	refresh_at = millis() + refresh_tmo;
+    if (!recompute_at) {
+	recompute_at = millis() + recompute_tmo;
     }
 }
 
@@ -436,30 +443,23 @@ function draw()
 	new_cpw = cpw_slider.value();
 	if (new_cpw != cpw) {
 	    cpw = new_cpw;
-	    if (!refresh_at) {
-		refresh_at = millis() + refresh_tmo;
+	    if (!recompute_at) {
+		recompute_at = millis() + recompute_tmo;
 	    }
 	}
     }
 
-    if (refresh_at && millis() >= refresh_at) {
+    if (recompute_at && millis() >= recompute_at && !mouseIsPressed) {
 	setup_int();
-	refresh_at = 0;
+	recompute_at = 0;
     }
 
-    draw_maze();
-
-    if (maze_computed) {
-	// noLoop();
-	return;
+    while (!mouseIsPressed && !maze_computed) {
+        maze_next();
     }
-    
-    var budget;
-     
-    for (budget = 0; budget < cells_per_frame; budget++) {
- 	if (maze_next()) {
-	    // noLoop();
- 	    break;
- 	}
+
+    if (refresh) {
+        draw_maze();
+        refresh = false;
     }
 }
