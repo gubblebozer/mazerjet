@@ -1,6 +1,7 @@
 var mwid, mhgt;
-var compute_seconds = 0.1;
-var fr = 5; // frameRate
+var compute_seconds = 5;
+var fr_base = 5; // base frameRate
+var fr_high = 30; // high frameRate, during maze draw
 var lnwid = 2;
 var w = 24;
 var cells;
@@ -138,6 +139,7 @@ function setup_int()
     // bb xx xx xx xx xx bb
     // bb xx xx mm xx xx bb
 
+    frameRate(fr_high);
     createCanvas(windowWidth, windowHeight);
     randomSeed(seed);
     cellsz = int(width / cpw);
@@ -152,15 +154,15 @@ function setup_int()
     maze_init();
     cells[c.x][c.y] = true;
 
-    cells_per_frame = ((mwid * mhgt) / compute_seconds) / fr;
+    cells_per_frame = Math.ceil(((mwid * mhgt) / compute_seconds) / fr_high);
     maze_computed = false;
     refresh = true;
+    draw_maze_background();
 }
 
 function setup()
 {
     seed = (hour() * 3600) + (minute() * 60) + second();
-    frameRate(fr);
     strokeWeight(1);
     setup_int();
     setup_controls();
@@ -266,6 +268,8 @@ function maze_next()
 	}
 	else {
 	    maze_computed = true;
+            frameRate(fr_base);
+            controls_up();
 	}
     }
     else {
@@ -369,20 +373,7 @@ function draw_maze()
     draw_cell({x: 0, y: 0}, false);
 
     if (maze_computed) {
-	stroke(0xff, 0, 0);
-	//fill(0xE8, 0xD2, 0x46);
-	fill(0xff, 0, 0);
-	strokeWeight(1);
-	var end = cell_coords(stack_max_p);
-	//var queen = String.fromCodePoint(0x2655);
-	//text(queen, end.x, end.y + cellsz);
-	ellipse(end.x + (cellsz / 2), end.y + (cellsz / 2), cellsz/2, cellsz/2);
-	
-	// 	    stroke(0xb0, 0, 0xff);
-	// 	    fill(0xb0, 0, 0xff);
-	// 	    end = cell_coords(edge_max_p);
-	// 	    ellipse(end.x + (cellsz / 2), end.y + (cellsz / 2), cellsz/2, cellsz/2);
-	
+
 	if (edge_max_p.x == 0) {
 	    draw_cell({ x: -1, y: edge_max_p.y }, true);
 	    draw_arrow( { x: -1, y: edge_max_p.y }, { x: 1, y: 0 });
@@ -454,7 +445,8 @@ function draw()
 	recompute_at = 0;
     }
 
-    while (!mouseIsPressed && !maze_computed) {
+    var budget = cells_per_frame;
+    while (!mouseIsPressed && !maze_computed && budget--) {
         maze_next();
     }
 
