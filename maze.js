@@ -111,8 +111,8 @@ function controls_up()
         btn_hide_controls.show();
         cpw_slider.show();
 	controls = true;
-        refresh = true;
     }
+    refresh = true;
 }
 
 function controls_down()
@@ -122,8 +122,8 @@ function controls_down()
         btn_hide_controls.hide();
         cpw_slider.hide();
 	controls = false;
-        refresh = true;
     }
+    refresh = true;
 }
 
 function setup_int()
@@ -407,6 +407,42 @@ function draw_maze()
     }
 }
 
+function draw_maze_area(x1, y1, x2, y2) 
+{
+    // fill in with proper outer maze color
+    if (is_print) {
+	stroke(0);
+	fill(0);
+    }
+    else {
+	stroke(0xff);
+	fill(0xff);
+    }
+    rect(x1, y1, x2, y2);
+
+    // redraw overlapping cells
+    var ax1 = floor(x1 / cellsz) - 1;
+    if (ax1 < 0) { ax1 = 0; }
+    var ay1 = floor(y1 / cellsz) - 1;
+    if (ay1 < 0) { ay1 = 0; }
+    var ax2 = ceil((x1 + x2) / cellsz) + 1;
+    if (ax2 > mwid) { ax2 = mwid; }
+    var ay2 = ceil((y1 + y2) / cellsz) + 1;
+    if (ay2 > mhgt) { ay2 = mhgt; }
+
+    print("ax1: " + ax1 + ", ay1: " + ay1 + ", ax2: " + ax2 + ", ay2: " + ay2);
+
+    var x, y;
+
+    for (x = ax1; x < ax2; x++) {
+	for (y = ay1; y < ay2; y++) {
+	    draw_cell({x: x, y: y}, false);
+	}
+    }
+    
+    draw_cell({x: 0, y: 0}, false);
+}
+
 function windowResized()
 {
     if (!recompute_at) {
@@ -453,5 +489,15 @@ function draw()
     if (refresh) {
         draw_maze();
         refresh = false;
+    }
+    else if (!mouseIsPressed && !maze_computed && controls) {
+        // redraw controls
+        if (advanced) {
+            draw_maze_area(control_p.x, control_p.y, 600, 270);
+        }
+        else {
+	    draw_maze_area(control_p.x, control_p.y, 600, 180);
+        }
+        draw_control_backdrop();
     }
 }
