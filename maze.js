@@ -19,16 +19,19 @@ var edge_max_p = { x: 0, y: 0 };
 var cells_per_frame = -1;
 var cpw_slider;
 var seed;
-var btn_seed_submit;
 var btn_new_maze;
 var btn_hide_controls;
+var sel_layout;
 var controls = false;
 var recompute_tmo = 250;
 var recompute_at = 0;
 var control_p = { x: 40, y: 40 };
-var advanced = false;
 var release_latch = false;
 var refresh = false;
+var layout = 'letter';  // { display, a4, letter }
+var view_width;
+var view_height;
+var first_time = true;
 
 function maze_init()
 {
@@ -62,40 +65,24 @@ function setup_controls()
     btn_new_maze.position(control_p.x + 10, control_p.y + 90);
     btn_new_maze.mousePressed(seed_randomize);
 
+    sel_layout = createSelect();
+    sel_layout.position(control_p.x + 10, control_p.y + 130);
+    sel_layout.option('display');
+    sel_layout.option('print: letter');
+    sel_layout.option('print: A4');
+    sel_layout.changed(layout_changed);
+    
     btn_hide_controls = createButton('hide controls');
-    btn_hide_controls.position(control_p.x + 10, control_p.y + 130);
+    btn_hide_controls.position(control_p.x + 10, control_p.y + 170);
     btn_hide_controls.mousePressed(hide_controls);
 
-    if (advanced) {
-        seed_input = createInput(seed);
-        seed_input.position(10, 50);
-        seed_input.style('width', '160px');
-        
-        btn_seed_submit = createButton('seed');
-        btn_seed_submit.position(175, 50);
-        btn_seed_submit.mousePressed(seed_set);
-    }
-    
     controls = true;
-}
-
-function seed_set()
-{
-    var tst = parseInt(seed_input.value());
-    if (tst != NaN) {
-	seed = tst;
-	if (!recompute_at) {
-	    recompute_at = millis() + recompute_tmo;
-	}
-    }
 }
 
 function seed_randomize()
 {
     seed = random(2147483648);
-    if (!recompute_at) {
-	recompute_at = millis() + recompute_tmo;
-    }
+    recompute();
 }
 
 function hide_controls()
@@ -104,12 +91,30 @@ function hide_controls()
     release_latch = true;
 }
 
+function layout_changed()
+{
+    var val = sel_layout.value();
+    switch (val) {
+    case 'display':
+        layout = 'display';
+        break;
+    case 'print: letter':
+        layout = 'letter';
+        break;
+    case 'print: A4':
+        layout = 'a4';
+        break;
+    }
+    recompute();
+}
+
 function controls_up()
 {
     if (!controls) {
         btn_new_maze.show();
         btn_hide_controls.show();
         cpw_slider.show();
+        sel_layout.show();
 	controls = true;
     }
     refresh = true;
@@ -121,6 +126,7 @@ function controls_down()
         btn_new_maze.hide();
         btn_hide_controls.hide();
         cpw_slider.hide();
+        sel_layout.hide();
 	controls = false;
     }
     refresh = true;
@@ -139,8 +145,22 @@ function setup_int()
     // bb xx xx xx xx xx bb
     // bb xx xx mm xx xx bb
 
+    switch (layout) {
+    case 'display':
+        view_width = windowWidth;
+        view_height = windowHeight;
+        break;
+    case 'letter':
+        view_width = windowWidth;
+        view_height = floor((windowWidth / 8.5) * 11.0);
+        break;
+    case 'a4':
+        view_width = windowWidth;
+        view_height = floor((windowWidth / 210.0) * 297.0);
+        break;
+    }
     frameRate(fr_high);
-    createCanvas(windowWidth, windowHeight);
+    createCanvas(view_width, view_height);
     randomSeed(seed);
     cellsz = int(width / cpw);
     mwid = int(width / cellsz) - 2;
@@ -269,7 +289,13 @@ function maze_next()
 	else {
 	    maze_computed = true;
             frameRate(fr_base);
-            controls_up();
+            if (first_time) {
+                controls_up();
+                first_time = false;
+            }
+            else {
+                refresh = true;
+            }
 	}
     }
     else {
@@ -308,7 +334,7 @@ function draw_maze_background()
     // clear canvas
     stroke(0xff);
     fill(0xff);
-    rect(0, 0, windowWidth, windowHeight);
+    rect(0, 0, view_width, view_height);
 
     // fill with proper outer maze color
     if (is_print) {
@@ -333,13 +359,7 @@ function draw_control_backdrop()
     strokeWeight(1);
     stroke(0x20, 0x20, 0xc0, 0xb0);
     fill(0x20, 0x20, 0xc0, 0xb0);
-    
-    if (advanced) {
-	rect(control_p.x, control_p.y, 600, 270);
-    }
-    else {
-	rect(control_p.x, control_p.y, 600, 180);
-    }
+    rect(control_p.x, control_p.y, 650, 220);
     
     noStroke();
     
@@ -353,9 +373,11 @@ function draw_control_backdrop()
     text("Right is harder.", 350, control_p.y + 65);
     
     text("Generate a different maze.", 350, control_p.y + 105);
+
+    text("Fill the screen or fill a printed page.", 350, control_p.y + 145);
     
-    text("Hide these controls so you can", 350, control_p.y + 145);
-    text("print out the maze.", 350, control_p.y + 165);
+    text("Hide these controls so you can", 350, control_p.y + 185);
+    text("print out the maze.", 350, control_p.y + 205);
 }
 
 function draw_maze() 
@@ -443,17 +465,32 @@ function draw_maze_area(x1, y1, x2, y2)
     draw_cell({x: 0, y: 0}, false);
 }
 
-function windowResized()
+function recompute()
 {
     if (!recompute_at) {
 	recompute_at = millis() + recompute_tmo;
     }
 }
 
+function windowResized()
+{
+    recompute();
+}
+
 function mousePressed()
 {
-    if (!release_latch && !controls) {
-        controls_up();
+    if (!release_latch) {
+        if (!controls) {
+            controls_up();
+        }
+        else if (controls) {
+            if (mouseX < control_p.x ||
+                mouseY < control_p.y ||
+                mouseX > control_p.x + 650 ||
+                mouseY > control_p.y + 220) {
+                controls_down();
+            }
+        }
     }
 }
 
@@ -470,9 +507,7 @@ function draw()
 	new_cpw = cpw_slider.value();
 	if (new_cpw != cpw) {
 	    cpw = new_cpw;
-	    if (!recompute_at) {
-		recompute_at = millis() + recompute_tmo;
-	    }
+            recompute();
 	}
     }
 
@@ -492,12 +527,7 @@ function draw()
     }
     else if (!mouseIsPressed && !maze_computed && controls) {
         // redraw controls
-        if (advanced) {
-            draw_maze_area(control_p.x, control_p.y, 600, 270);
-        }
-        else {
-	    draw_maze_area(control_p.x, control_p.y, 600, 180);
-        }
+	draw_maze_area(control_p.x, control_p.y, 650, 220);
         draw_control_backdrop();
     }
 }
