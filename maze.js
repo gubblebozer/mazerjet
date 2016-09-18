@@ -28,7 +28,7 @@ var recompute_at = 0;
 var control_p = { x: 40, y: 40 };
 var release_latch = false;
 var refresh = false;
-var layout = 'letter';  // { display, a4, letter }
+var layout = 'letter';  // { letter, a4, display } - XXX: letter must be first
 var view_width;
 var view_height;
 var first_time = true;
@@ -67,9 +67,9 @@ function setup_controls()
 
     sel_layout = createSelect();
     sel_layout.position(control_p.x + 10, control_p.y + 130);
-    sel_layout.option('display');
     sel_layout.option('print: letter');
     sel_layout.option('print: A4');
+    sel_layout.option('display');
     sel_layout.changed(layout_changed);
     
     btn_hide_controls = createButton('hide controls');
