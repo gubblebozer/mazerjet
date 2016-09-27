@@ -11,7 +11,6 @@ var stack_num = 0;
 var cpw = 39;
 var cellsz = 0;
 var maze_computed = false;
-var is_print = true;
 var stack_max = 0;
 var stack_max_p = { x: 0, y: 0 };
 var edge_max = 0;
@@ -27,11 +26,10 @@ var recompute_tmo = 250;
 var recompute_at = 0;
 var control_p = { x: 40, y: 40 };
 var release_latch = false;
-var refresh = false;
 var layout = 'letter';  // { letter, a4, display } - XXX: letter must be first
 var view_width;
 var view_height;
-var first_time = true;
+var buffer;
 
 function maze_init()
 {
@@ -117,7 +115,6 @@ function controls_up()
         sel_layout.show();
 	controls = true;
     }
-    refresh = true;
 }
 
 function controls_down()
@@ -129,7 +126,6 @@ function controls_down()
         sel_layout.hide();
 	controls = false;
     }
-    refresh = true;
 }
 
 function setup_int()
@@ -151,16 +147,20 @@ function setup_int()
         view_height = windowHeight;
         break;
     case 'letter':
-        view_width = windowWidth;
-        view_height = floor((windowWidth / 8.5) * 11.0);
+        wid = windowWidth - 20; // fudge
+        view_width = wid; // fudge
+        view_height = floor((wid / 8.5) * 11.0);
         break;
     case 'a4':
-        view_width = windowWidth;
-        view_height = floor((windowWidth / 210.0) * 297.0);
+        wid = windowWidth - 20;
+        view_width = wid;
+        view_height = floor((wid / 210.0) * 297.0);
         break;
     }
     frameRate(fr_high);
     createCanvas(view_width, view_height);
+    buffer = createGraphics(width, height);
+    buffer.strokeWeight(1);
     randomSeed(seed);
     cellsz = int(width / cpw);
     mwid = int(width / cellsz) - 2;
@@ -176,14 +176,12 @@ function setup_int()
 
     cells_per_frame = Math.ceil(((mwid * mhgt) / compute_seconds) / fr_high);
     maze_computed = false;
-    refresh = true;
     draw_maze_background();
 }
 
 function setup()
 {
     seed = (hour() * 3600) + (minute() * 60) + second();
-    strokeWeight(1);
     setup_int();
     setup_controls();
 }
@@ -199,19 +197,13 @@ function cell_coords(p)
 function draw_cell(p, force)
 {
     if (force || cells[p.x][p.y]) {
-	if (is_print) {
-	    stroke(0xff);
-	    fill(0xff);
-	}
-	else {
-	    stroke(0);
-	    fill(0);
-	}
-	strokeWeight(cellsz / 2);
+	buffer.stroke(0xff);
+	buffer.fill(0xff);
+	buffer.strokeWeight(cellsz / 2);
 
 	var pc = cell_coords(p);
 	
-	rect(pc.x, pc.y, cellsz, cellsz);
+	buffer.rect(pc.x, pc.y, cellsz, cellsz);
     }
 }
 
@@ -221,29 +213,22 @@ function draw_arrow(p, from)
     var K = (cellsz / 2);
     var ctr = { x: ul.x + K, y: ul.y + K };
     
-    if (!is_print) {
-	stroke(0xff);
-	fill(0xff);
-    }
-    else {
-	stroke(0);
-	fill(0);
-    }
-    
-    strokeWeight(cellsz / 4);
+    buffer.stroke(0);
+    buffer.fill(0);
+    buffer.strokeWeight(cellsz / 4);
     var endx = ctr.x - (K * from.x);
     var endy = ctr.y - (K * from.y);
-    line(ctr.x + (K * from.x), ctr.y + (K * from.y), ctr.x, ctr.y);
-    strokeWeight(1);
+    buffer.line(ctr.x + (K * from.x), ctr.y + (K * from.y), ctr.x, ctr.y);
+    buffer.strokeWeight(1);
     if (from.x < 0 || from.x > 0) {
- 	triangle(ctr.x, ctr.y - (cellsz / 3),
- 		 ctr.x, ctr.y + (cellsz / 3),
- 		 endx, endy);
+ 	buffer.triangle(ctr.x, ctr.y - (cellsz / 3),
+ 		        ctr.x, ctr.y + (cellsz / 3),
+ 		        endx, endy);
      }
      else if (from.y < 0 || from.y > 0) {
- 	triangle(ctr.x - (cellsz / 3), ctr.y,
- 		 ctr.x + (cellsz / 3), ctr.y,
- 		 endx, endy);
+ 	 buffer.triangle(ctr.x - (cellsz / 3), ctr.y,
+ 		         ctr.x + (cellsz / 3), ctr.y,
+ 		         endx, endy);
      }
 }
 
@@ -289,13 +274,7 @@ function maze_next()
 	else {
 	    maze_computed = true;
             frameRate(fr_base);
-            if (first_time) {
-                controls_up();
-                first_time = false;
-            }
-            else {
-                refresh = true;
-            }
+            draw_ends();
 	}
     }
     else {
@@ -328,26 +307,19 @@ function maze_next()
     return maze_computed;
 }
 
-
 function draw_maze_background()
 {
     // clear canvas
-    stroke(0xff);
-    fill(0xff);
-    rect(0, 0, view_width, view_height);
+    buffer.stroke(0xff);
+    buffer.fill(0xff);
+    buffer.rect(0, 0, view_width, view_height);
 
     // fill with proper outer maze color
-    if (is_print) {
-	stroke(0);
-	fill(0);
-    }
-    else {
-	stroke(0xff);
-	fill(0xff);
-    }
-    rect(0, 0, 
-	 ((mwid + 2) * cellsz), 
-	 ((mhgt + 2) * cellsz));
+    buffer.stroke(0);
+    buffer.fill(0);
+    buffer.rect(0, 0, 
+	        ((mwid + 2) * cellsz), 
+	        ((mhgt + 2) * cellsz));
 
     // draw first cell
     draw_cell({x: 0, y: 0}, false);
@@ -380,89 +352,34 @@ function draw_control_backdrop()
     text("print out the maze.", 350, control_p.y + 205);
 }
 
-function draw_maze() 
+function draw_ends()
 {
-    draw_maze_background();
-
-    var x, y;
-
-    for (x = 0; x < mwid; x++) {
-	for (y = 0; y < mhgt; y++) {
-	    draw_cell({x: x, y: y}, false);
-	}
+    if (edge_max_p.x == 0) {
+	draw_cell({ x: -1, y: edge_max_p.y }, true);
+	draw_arrow( { x: -1, y: edge_max_p.y }, { x: 1, y: 0 });
     }
-    
-    draw_cell({x: 0, y: 0}, false);
-
-    if (maze_computed) {
-
-	if (edge_max_p.x == 0) {
-	    draw_cell({ x: -1, y: edge_max_p.y }, true);
-	    draw_arrow( { x: -1, y: edge_max_p.y }, { x: 1, y: 0 });
-	}
-	else if (edge_max_p.x == mwid - 1) {
-	    draw_cell({ x: mwid, y: edge_max_p.y }, true);
-	    draw_arrow( { x: mwid, y: edge_max_p.y }, { x: -1, y: 0 });
-	}
-	else if (edge_max_p.y == 0) {
-	    draw_cell({ x: edge_max_p.x, y: -1 }, true);
-	    draw_arrow({ x: edge_max_p.x, y: -1 }, { x: 0, y: 1 });
-	}
-	else {
-	    draw_cell({ x: edge_max_p.x, y: mhgt }, true);
-	    draw_arrow({ x: edge_max_p.x, y: mhgt }, { x: 0, y: -1 });
-	}
-	
-	// draw starting arrow, cutout cell
-	if (cells[1][0]) {
-	    draw_cell({ x: -1, y: 0 }, true);
-	    draw_arrow( { x: -1, y: 0 }, { x: -1, y: 0} );
-	}
-	else {
-	    draw_cell({ x: 0, y: -1 }, true);
-	    draw_arrow( { x: 0, y: -1 }, { x: 0, y: -1} );
-	}
+    else if (edge_max_p.x == mwid - 1) {
+	draw_cell({ x: mwid, y: edge_max_p.y }, true);
+	draw_arrow( { x: mwid, y: edge_max_p.y }, { x: -1, y: 0 });
     }
-
-    if (controls) {
-        draw_control_backdrop();
-    }
-}
-
-function draw_maze_area(x1, y1, x2, y2) 
-{
-    // fill in with proper outer maze color
-    if (is_print) {
-	stroke(0);
-	fill(0);
+    else if (edge_max_p.y == 0) {
+	draw_cell({ x: edge_max_p.x, y: -1 }, true);
+	draw_arrow({ x: edge_max_p.x, y: -1 }, { x: 0, y: 1 });
     }
     else {
-	stroke(0xff);
-	fill(0xff);
-    }
-    rect(x1, y1, x2, y2);
-
-    // redraw overlapping cells
-    var ax1 = floor(x1 / cellsz) - 1;
-    if (ax1 < 0) { ax1 = 0; }
-    var ay1 = floor(y1 / cellsz) - 1;
-    if (ay1 < 0) { ay1 = 0; }
-    var ax2 = ceil((x1 + x2) / cellsz) + 1;
-    if (ax2 > mwid) { ax2 = mwid; }
-    var ay2 = ceil((y1 + y2) / cellsz) + 1;
-    if (ay2 > mhgt) { ay2 = mhgt; }
-
-    print("ax1: " + ax1 + ", ay1: " + ay1 + ", ax2: " + ax2 + ", ay2: " + ay2);
-
-    var x, y;
-
-    for (x = ax1; x < ax2; x++) {
-	for (y = ay1; y < ay2; y++) {
-	    draw_cell({x: x, y: y}, false);
-	}
+	draw_cell({ x: edge_max_p.x, y: mhgt }, true);
+	draw_arrow({ x: edge_max_p.x, y: mhgt }, { x: 0, y: -1 });
     }
     
-    draw_cell({x: 0, y: 0}, false);
+    // draw starting arrow, cutout cell
+    if (cells[1][0]) {
+	draw_cell({ x: -1, y: 0 }, true);
+	draw_arrow( { x: -1, y: 0 }, { x: -1, y: 0} );
+    }
+    else {
+	draw_cell({ x: 0, y: -1 }, true);
+	draw_arrow( { x: 0, y: -1 }, { x: 0, y: -1} );
+    }
 }
 
 function recompute()
@@ -521,13 +438,9 @@ function draw()
         maze_next();
     }
 
-    if (refresh) {
-        draw_maze();
-        refresh = false;
-    }
-    else if (!mouseIsPressed && !maze_computed && controls) {
-        // redraw controls
-	draw_maze_area(control_p.x, control_p.y, 650, 220);
+    image(buffer, 0, 0);
+
+    if (controls) {
         draw_control_backdrop();
     }
 }
