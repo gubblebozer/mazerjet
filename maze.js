@@ -1,6 +1,6 @@
 var mwid, mhgt;
 var compute_seconds = 5;
-gvar fr_base = 5; // base frameRate
+var fr_base = 5; // base frameRate
 var fr_solve = 15; // solving frameRate
 var fr_high = 30; // high frameRate, during maze draw
 var lnwid = 2;
