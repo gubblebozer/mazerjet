@@ -1,6 +1,7 @@
 var mwid, mhgt;
 var compute_seconds = 5;
-var fr_base = 5; // base frameRate
+gvar fr_base = 5; // base frameRate
+var fr_solve = 15; // solving frameRate
 var fr_high = 30; // high frameRate, during maze draw
 var lnwid = 2;
 var w = 24;
@@ -11,6 +12,7 @@ var stack_num = 0;
 var cpw = 39;
 var cellsz = 0;
 var maze_computed = false;
+var maze_solved = false;
 var stack_max = 0;
 var stack_max_p = { x: 0, y: 0 };
 var edge_max = 0;
@@ -26,10 +28,11 @@ var recompute_tmo = 250;
 var recompute_at = 0;
 var control_p = { x: 40, y: 40 };
 var release_latch = false;
-var layout = 'letter';  // { letter, a4, display } - XXX: letter must be first
+var layout = 'display';  // { display, letter, a4 } - XXX: display must be first
 var view_width;
 var view_height;
 var buffer;
+var muller = { x: 0, y: 0, a: 0 } // a: vector angle (deg)
 
 function maze_init()
 {
@@ -65,9 +68,9 @@ function setup_controls()
 
     sel_layout = createSelect();
     sel_layout.position(control_p.x + 10, control_p.y + 130);
+    sel_layout.option('display');
     sel_layout.option('print: letter');
     sel_layout.option('print: A4');
-    sel_layout.option('display');
     sel_layout.changed(layout_changed);
     
     btn_hide_controls = createButton('hide controls');
@@ -145,16 +148,19 @@ function setup_int()
     case 'display':
         view_width = windowWidth;
         view_height = windowHeight;
+        maze_solved = false;
         break;
     case 'letter':
         wid = windowWidth - 20; // fudge
         view_width = wid; // fudge
         view_height = floor((wid / 8.5) * 11.0);
+        maze_solved = true;
         break;
     case 'a4':
         wid = windowWidth - 20;
         view_width = wid;
         view_height = floor((wid / 210.0) * 297.0);
+        maze_solved = true;
         break;
     }
     frameRate(fr_high);
@@ -173,6 +179,7 @@ function setup_int()
     }
     maze_init();
     cells[c.x][c.y] = true;
+    muller = { x: 0, y: 0, a: 0 }
 
     cells_per_frame = Math.ceil(((mwid * mhgt) / compute_seconds) / fr_high);
     maze_computed = false;
@@ -212,7 +219,7 @@ function draw_arrow(p, from)
     var ul = cell_coords(p);
     var K = (cellsz / 2);
     var ctr = { x: ul.x + K, y: ul.y + K };
-    
+
     buffer.stroke(0);
     buffer.fill(0);
     buffer.strokeWeight(cellsz / 4);
@@ -230,6 +237,19 @@ function draw_arrow(p, from)
  		         ctr.x + (cellsz / 3), ctr.y,
  		         endx, endy);
      }
+}
+
+function draw_muller()
+{
+    var ul = cell_coords(muller);
+    var K = (cellsz / 2);
+    var ctr = { x: ul.x + K, y: ul.y + K };
+
+    strokeWeight(1);
+    stroke(0, 0, 0xff, 1.0);
+    fill(0, 0, 0xff, 0xff, 1.0);
+    rect(ctr.x - K, ctr.y - K, cellsz, cellsz);
+    strokeWeight(1);
 }
 
 function maze_next()
@@ -273,12 +293,12 @@ function maze_next()
 	}
 	else {
 	    maze_computed = true;
-            frameRate(fr_base);
+            frameRate(fr_solve);
             draw_ends();
 	}
     }
     else {
-	// Choose randomly one of the unvisited neighbours
+	// Choose randomly one of the unvisited neighbors
 	// Push the current cell to the stack
 	// Remove the wall between the current cell and the chosen cell
 	// Make the chosen cell the current cell and mark it as visited
@@ -375,11 +395,112 @@ function draw_ends()
     if (cells[1][0]) {
 	draw_cell({ x: -1, y: 0 }, true);
 	draw_arrow( { x: -1, y: 0 }, { x: -1, y: 0} );
+        muller.a = 90;
     }
     else {
 	draw_cell({ x: 0, y: -1 }, true);
 	draw_arrow( { x: 0, y: -1 }, { x: 0, y: -1} );
+        muller.a = 180;
     }
+}
+
+function left(a)
+{
+    a = a - 90
+    if (a < 0) {
+        a += 360;
+    }
+    return(a);
+}
+
+function right(a)
+{
+    a = a + 90
+    if (a >= 360) {
+        a -= 360;
+    }
+    return(a);
+}
+
+function a2v(a)
+{
+    v = { x: 0, y: 0 }
+    switch(a) {
+    case 0:
+        v.x = 0;
+        v.y = -1;
+        break;
+    case 90:
+        v.x = 1;
+        v.y = 0;
+        break;
+    case 180:
+        v.x = 0;
+        v.y = 1;
+        break;
+    case 270:
+        v.x = -1;
+        v.y = 0;
+        break;
+    }
+    return(v);
+}
+
+function bump(p)
+{
+    if (p.x < 0 || p.x >= mwid || p.y < 0 || p.y >= mhgt) {
+        return(true);
+    }
+    if (!cells[p.x][p.y]) {
+        return(true);
+    }
+    return(false);
+}
+
+function solve()
+{
+    if (!maze_computed) {
+        return;
+    }
+
+    if (maze_solved) {
+        return;
+    }
+
+    draw_muller();
+
+    // exit?
+    if (muller.x == edge_max_p.x && muller.y == edge_max_p.y) {
+        maze_solved = true;
+        frameRate(fr_base);
+        print("YAY");
+        return;
+    }
+
+    // if there's an opening to the left, turn towards it
+    a = left(muller.a);
+    v = a2v(a);
+    p = { x: muller.x + v.x, y: muller.y + v.y }
+    if (!bump(p)) {
+        muller.a = a;
+     }
+
+    // if the way forward is blocked, turn towards the right
+    v = a2v(muller.a);
+    p = { x: muller.x + v.x, y: muller.y + v.y }
+    if (bump(p)) {
+        muller.a = right(muller.a);
+     }
+
+    // if the way forward is open, go ahead
+    v = a2v(muller.a);
+    p = { x: muller.x + v.x, y: muller.y + v.y }
+    if (!bump(p)) {
+        muller.x += v.x;
+        muller.y += v.y;
+    }
+
+    draw_muller();
 }
 
 function recompute()
@@ -439,6 +560,7 @@ function draw()
     }
 
     image(buffer, 0, 0);
+    solve();
 
     if (controls) {
         draw_control_backdrop();
